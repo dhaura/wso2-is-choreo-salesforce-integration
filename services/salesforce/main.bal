@@ -1,14 +1,14 @@
 import ballerina/http;
 
-type Greeting record {
-    string 'from;
-    string to;
-    string message;
+type User record {
+    string username;
+    string firstName;
+    string lastName;
 };
 
-service / on new http:Listener(8090) {
-    resource function get .(string name) returns Greeting {
-        Greeting greetingMessage = {"from" : "Choreo", "to" : name, "message" : "Welcome to Choreo!"};
-        return greetingMessage;
+service /scim/users on new http:Listener(8090) {
+    resource function post .(User user) returns User {
+        
+        return user;
     }
 }
