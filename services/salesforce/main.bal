@@ -1,5 +1,7 @@
 import ballerina/http;
 import ballerina/log;
+import ballerina/io;
+import ballerinax/scim;
 
 type User record {
     string username;
@@ -10,10 +12,18 @@ type User record {
 
 listener http:Listener httpListener = new(8090);
 
-service / on httpListener {
-    resource function post scim/users (User user) returns User {
+service /scim2 on httpListener {
+    resource function post Users(http:Request request) returns error? {
         
-        log:printInfo("Salesforce Provisoning User : " + user.username);
-        return user;
+        json jsonPayload = check request.getJsonPayload();
+        scim:UserResource userResource = check jsonPayload.cloneWithType(scim:UserResource);
+        string[] emails = userResource?.emails ?: [];
+        string email = emails.pop();
+        string firstName = userResource?.name?.givenName ?: "";
+        string lastName = userResource?.name?.familyName ?: "";
+
+        log:printInfo("Salesforce Provisoning User Email : " + email);
+        io:println("Salesforce Provisoning User First Name : " + firstName);
+        io:println("Salesforce Provisoning User Last Name : " + lastName);
     }
 }
