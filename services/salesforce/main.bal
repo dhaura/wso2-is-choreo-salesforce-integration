@@ -1,4 +1,5 @@
 import ballerina/http;
+import ballerina/log;
 
 type User record {
     string username;
@@ -6,9 +7,13 @@ type User record {
     string lastName;
 };
 
-service /scim/users on new http:Listener(8090) {
-    resource function post .(User user) returns User {
+
+listener http:Listener httpListener = new(8090);
+
+service / on httpListener {
+    resource function post scim/users (User user) returns User {
         
+        log:printInfo("Salesforce Provisoning User : " + user.username);
         return user;
     }
 }
