@@ -1,17 +1,22 @@
 import ballerina/http;
+import ballerina/lang.array;
 import ballerina/log;
-import ballerina/io;
-import ballerinax/scim;
+import ballerina/regex;
 import ballerinax/salesforce;
+import ballerinax/scim;
 
-// Create Salesforce client configuration by reading from environment.
+// Configurable Salesforce client configuration attributes.
 configurable string salesforceAppClientId = ?;
 configurable string salesforceAppClientSecret = ?;
 configurable string salesforceAppRefreshToken = ?;
 configurable string salesforceAppRefreshUrl = ?;
 configurable string salesforceAppBaseUrl = ?;
 
-// Using direct-token config for client configuration
+// Configurable authorization configuration attributes.
+configurable string USERNAME = "admin";
+configurable string PASSWORD = "admin";
+
+// Using direct-token config for client configuration.
 salesforce:ConnectionConfig sfConfig = {
     baseUrl: salesforceAppBaseUrl,
     auth: {
@@ -22,24 +27,55 @@ salesforce:ConnectionConfig sfConfig = {
     }
 };
 
+function checkAuth(string authHeader) returns error? {
+
+    if authHeader.startsWith("Basic ") {
+        string encodedCredentials = authHeader.substring(6);
+        string decodedCredentials = check string:fromBytes(check array:fromBase64(encodedCredentials));
+        string[] credentials = regex:split(decodedCredentials,":");
+
+        if credentials.length() == 2 {
+            string username = credentials[0];
+            string password = credentials[1];
+
+            // Check username and password.
+            if (USERNAME == username && PASSWORD == password) {
+                return;
+            } else {
+                return error("Invalid credentials.");
+            }
+        } else {
+            return error("Invalid credentials format.");
+        }
+    } else {
+        return error("Authorization header must be Basic Auth.");
+    }
+}
+
 listener http:Listener httpListener = new(8090);
 
 service /scim2 on httpListener {
-    resource function post Users(http:Caller caller, http:Request request) returns error? {
+    resource function post Users(@http:Payload scim:UserResource userResource, @http:Header string authorization) returns http:Created|error {
         
+        // Check and validate authorization credentials.
+        error|null authError = check checkAuth(authorization);
+        if (authError is error) {
+            return authError;
+        }
+
+        // Create Salesforce client.
         salesforce:Client baseClient = check new (sfConfig);
 
-        json jsonPayload = check request.getJsonPayload();
-        scim:UserResource userResource = check jsonPayload.cloneWithType(scim:UserResource);
+        // Extract user info from the SCIM request.
         string[] emails = userResource?.emails ?: [];
         string email = emails.pop();
         string firstName = userResource?.name?.givenName ?: "";
         string lastName = userResource?.name?.familyName ?: "";
 
-        log:printInfo("Salesforce Provisoning User Email : " + email);
-        io:println("Salesforce Provisoning User First Name : " + firstName);
-        io:println("Salesforce Provisoning User Last Name : " + lastName);
+        log:printInfo("Salesforce provisoning user info: {email: " + email + 
+            ", firstName: " + firstName + ", lastName: " + lastName + "}");
 
+        // Create a Salesforce lead record.
         record {} leadRecord = {
             "Company": string `${firstName}_${lastName}`,
             "Email": email,
@@ -47,19 +83,16 @@ service /scim2 on httpListener {
             "LastName": lastName
         };
 
-        salesforce:CreationResponse|error res = baseClient->create("Lead", leadRecord);
+        // Initiate the Salesforce lead creation request.
+        salesforce:CreationResponse|error sfResponse = baseClient->create("Lead", leadRecord);
 
-        // Send a response back.
-        http:Response res1 = new;
-        if (res is salesforce:CreationResponse) {
-            log:printInfo("Lead Created Successfully. Lead ID : " + res.id);
-            res1.statusCode = 200;
-            res1.setPayload("Created the lead: " + res.toString());
+        // Send response back to IS.
+        if (sfResponse is salesforce:CreationResponse) {
+            log:printInfo("Lead Created Successfully. Lead ID : " + sfResponse.id);
+            return http:CREATED;
         } else {
-            log:printError(msg = res.message());
-            res1.statusCode = 400;
-            res1.setPayload("Lead creation failed: " + res.toString());
+            log:printError(msg = sfResponse.message());
+            return error(sfResponse.message());
         }
-        check caller->respond(res1);
     }
 }
