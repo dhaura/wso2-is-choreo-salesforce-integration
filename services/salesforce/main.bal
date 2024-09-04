@@ -55,7 +55,7 @@ function checkAuth(string authHeader) returns error? {
 listener http:Listener httpListener = new(8090);
 
 service /scim2 on httpListener {
-    resource function post Users(@http:Payload scim:UserResource userResource, @http:Header string authorization) returns http:Created|error {
+    resource function post users(http:Caller caller, @http:Payload scim:UserResource userResource, @http:Header string authorization) returns error? {
         
         // Check and validate authorization credentials.
         error|null authError = check checkAuth(authorization);
@@ -89,7 +89,22 @@ service /scim2 on httpListener {
         // Send response back to IS.
         if (sfResponse is salesforce:CreationResponse) {
             log:printInfo("Lead Created Successfully. Lead ID : " + sfResponse.id);
-            return http:CREATED;
+
+            json body = {
+                "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+                "id": sfResponse.id,
+                "userName":  userResource?.userName ?: "",
+                "name": {
+                    "givenName": userResource?.name?.givenName ?: "",
+                    "familyName": userResource?.name?.familyName ?: ""
+                },
+                "emails": userResource?.emails ?: []
+            };
+            http:Response response = new;
+            response.statusCode = http:STATUS_CREATED;
+            response.setJsonPayload(body);
+            
+            check caller->respond(response);
         } else {
             log:printError(msg = sfResponse.message());
             return error(sfResponse.message());
