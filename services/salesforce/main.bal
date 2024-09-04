@@ -29,7 +29,7 @@ salesforce:ConnectionConfig sfConfig = {
 
 function checkAuth(string authHeader) returns error? {
 
-    if authHeader.startsWith("Basic ") {
+    if authHeader.startsWith("Basic") {
         string encodedCredentials = authHeader.substring(6);
         string decodedCredentials = check string:fromBytes(check array:fromBase64(encodedCredentials));
         string[] credentials = regex:split(decodedCredentials, ":");
@@ -101,6 +101,46 @@ service /scim2 on httpListener {
             response.statusCode = http:STATUS_BAD_REQUEST;
             response.setJsonPayload({"message": sfResponse.message()});
         }
+        return check caller->respond(response);
+    }
+
+    resource function put users/[string userId](http:Caller caller, @http:Payload scim:UserResource userResource, @http:Header string authorization) returns error? {
+
+        // Check and validate authorization credentials.
+        error|null authError = check checkAuth(authorization);
+        if (authError is error) {
+            http:Response response = new;
+            response.statusCode = http:STATUS_UNAUTHORIZED;
+            response.setJsonPayload({"message": authError.message()});
+
+            return check caller->respond(response);
+        }
+
+        log:printInfo("Updating user with ID: " + userId);
+
+        // Send response back to IS.
+        http:Response response = new;
+        response.statusCode = http:STATUS_OK;
+        return check caller->respond(response);
+    }
+
+    resource function delete users/[string userId](http:Caller caller, @http:Header string authorization) returns error? {
+
+        // Check and validate authorization credentials.
+        error|null authError = check checkAuth(authorization);
+        if (authError is error) {
+            http:Response response = new;
+            response.statusCode = http:STATUS_UNAUTHORIZED;
+            response.setJsonPayload({"message": authError.message()});
+
+            return check caller->respond(response);
+        }
+
+        log:printInfo("Deleting user with ID: " + userId);
+
+        // Send response back to IS.
+        http:Response response = new;
+        response.statusCode = http:STATUS_NO_CONTENT;
         return check caller->respond(response);
     }
 }
