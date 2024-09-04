@@ -64,7 +64,7 @@ service /scim2 on httpListener {
             response.statusCode = http:STATUS_UNAUTHORIZED;
             response.setJsonPayload({"message": authError.message()});
 
-            check caller->respond(response);
+            return check caller->respond(response);
         }
 
         // Create Salesforce client.
@@ -91,32 +91,16 @@ service /scim2 on httpListener {
         salesforce:CreationResponse|error sfResponse = baseClient->create("Lead", leadRecord);
 
         // Send response back to IS.
+        http:Response response = new;
         if (sfResponse is salesforce:CreationResponse) {
             log:printInfo("Lead Created Successfully. Lead ID : " + sfResponse.id);
-
-            json body = {
-                "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
-                "id": sfResponse.id,
-                "userName": userResource?.userName ?: "",
-                "name": {
-                    "givenName": userResource?.name?.givenName ?: "",
-                    "familyName": userResource?.name?.familyName ?: ""
-                },
-                "emails": userResource?.emails ?: []
-            };
-            http:Response response = new;
             response.statusCode = http:STATUS_CREATED;
-            response.setJsonPayload(body);
-
-            check caller->respond(response);
+            response.setJsonPayload(userResource.toJson());
         } else {
             log:printError(msg = sfResponse.message());
-
-            http:Response response = new;
             response.statusCode = http:STATUS_BAD_REQUEST;
             response.setJsonPayload({"message": sfResponse.message()});
-
-            check caller->respond(response);
         }
+        return check caller->respond(response);
     }
 }
