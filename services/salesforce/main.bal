@@ -32,7 +32,7 @@ function checkAuth(string authHeader) returns error? {
     if authHeader.startsWith("Basic ") {
         string encodedCredentials = authHeader.substring(6);
         string decodedCredentials = check string:fromBytes(check array:fromBase64(encodedCredentials));
-        string[] credentials = regex:split(decodedCredentials,":");
+        string[] credentials = regex:split(decodedCredentials, ":");
 
         if credentials.length() == 2 {
             string username = credentials[0];
@@ -52,15 +52,19 @@ function checkAuth(string authHeader) returns error? {
     }
 }
 
-listener http:Listener httpListener = new(8090);
+listener http:Listener httpListener = new (8090);
 
 service /scim2 on httpListener {
     resource function post users(http:Caller caller, @http:Payload scim:UserResource userResource, @http:Header string authorization) returns error? {
-        
+
         // Check and validate authorization credentials.
         error|null authError = check checkAuth(authorization);
         if (authError is error) {
-            return authError;
+            http:Response response = new;
+            response.statusCode = http:STATUS_UNAUTHORIZED;
+            response.setJsonPayload({"message": authError.message()});
+
+            check caller->respond(response);
         }
 
         // Create Salesforce client.
@@ -72,7 +76,7 @@ service /scim2 on httpListener {
         string firstName = userResource?.name?.givenName ?: "";
         string lastName = userResource?.name?.familyName ?: "";
 
-        log:printInfo("Salesforce provisoning user info: {email: " + email + 
+        log:printInfo("Salesforce provisoning user info: {email: " + email +
             ", firstName: " + firstName + ", lastName: " + lastName + "}");
 
         // Create a Salesforce lead record.
@@ -93,7 +97,7 @@ service /scim2 on httpListener {
             json body = {
                 "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
                 "id": sfResponse.id,
-                "userName":  userResource?.userName ?: "",
+                "userName": userResource?.userName ?: "",
                 "name": {
                     "givenName": userResource?.name?.givenName ?: "",
                     "familyName": userResource?.name?.familyName ?: ""
@@ -103,11 +107,16 @@ service /scim2 on httpListener {
             http:Response response = new;
             response.statusCode = http:STATUS_CREATED;
             response.setJsonPayload(body);
-            
+
             check caller->respond(response);
         } else {
             log:printError(msg = sfResponse.message());
-            return error(sfResponse.message());
+
+            http:Response response = new;
+            response.statusCode = http:STATUS_BAD_REQUEST;
+            response.setJsonPayload({"message": sfResponse.message()});
+
+            check caller->respond(response);
         }
     }
 }
