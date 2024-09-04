@@ -6,11 +6,11 @@ import ballerinax/salesforce;
 import ballerinax/scim;
 
 // Configurable Salesforce client configuration attributes.
-configurable string salesforceAppClientId = ?;
-configurable string salesforceAppClientSecret = ?;
-configurable string salesforceAppRefreshToken = ?;
-configurable string salesforceAppRefreshUrl = ?;
-configurable string salesforceAppBaseUrl = ?;
+configurable string SF_APP_CLIENT_ID = ?;
+configurable string SF_APP_CLIENT_SECRET = ?;
+configurable string SF_APP_REFRESH_TOKEN = ?;
+configurable string SF_APP_REFRESH_TOKEN_URL = ?;
+configurable string SF_APP_BASE_URL = ?;
 
 // Configurable authorization configuration attributes.
 configurable string USERNAME = "admin";
@@ -18,12 +18,12 @@ configurable string PASSWORD = "admin";
 
 // Using direct-token config for client configuration.
 salesforce:ConnectionConfig sfConfig = {
-    baseUrl: salesforceAppBaseUrl,
+    baseUrl: SF_APP_BASE_URL,
     auth: {
-        clientId: salesforceAppClientId,
-        clientSecret: salesforceAppClientSecret,
-        refreshToken: salesforceAppRefreshToken,
-        refreshUrl: salesforceAppRefreshUrl
+        clientId: SF_APP_CLIENT_ID,
+        clientSecret: SF_APP_CLIENT_SECRET,
+        refreshToken: SF_APP_REFRESH_TOKEN,
+        refreshUrl: SF_APP_REFRESH_TOKEN_URL
     }
 };
 
