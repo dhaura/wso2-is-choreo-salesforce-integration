@@ -84,8 +84,7 @@ service /scim2 on httpListener {
         salesforce:Client baseClient = check new (sfConfig);
 
         // Extract user info from the SCIM request.
-        string[] emails = userResource?.emails ?: [];
-        string email = emails.pop();
+        string email = userResource?.userName ?: "";
         string firstName = userResource?.name?.givenName ?: "";
         string lastName = userResource?.name?.familyName ?: "";
 
@@ -131,7 +130,7 @@ service /scim2 on httpListener {
         string? userName = getUsername(filter);
         if !(userName is string) {
             http:Response response = new;
-            response.statusCode = http:STATUS_UNAUTHORIZED;
+            response.statusCode = http:STATUS_BAD_REQUEST;
             response.setJsonPayload({"message": "Invalid filter query"});
             return check caller->respond(response);
         }
