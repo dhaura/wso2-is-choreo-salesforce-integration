@@ -27,6 +27,10 @@ salesforce:ConnectionConfig sfConfig = {
     }
 };
 
+type LeadRecord record {
+    string Id;
+};
+
 function checkAuth(string authHeader) returns error? {
 
     if authHeader.startsWith("Basic") {
@@ -52,18 +56,27 @@ function checkAuth(string authHeader) returns error? {
     }
 }
 
+isolated function getUsername(string[] filter) returns string? {
+
+    if filter.length() > 0 && filter[0].startsWith("userName Eq ") {
+        return filter[0].substring(12);
+    } else {
+        return null;
+    }
+}
+
 listener http:Listener httpListener = new (8090);
 
 service /scim2 on httpListener {
-    resource function post users(http:Caller caller, @http:Payload scim:UserResource userResource, @http:Header string authorization) returns error? {
+    resource function post users(@http:Payload scim:UserResource userResource, @http:Header string authorization, http:Caller caller) returns error? {
 
         // Check and validate authorization credentials.
-        error|null authError = check checkAuth(authorization);
-        if (authError is error) {
-            http:Response response = new;
+        do {
+	        _ = check checkAuth(authorization);
+        } on fail var e {
+        	http:Response response = new;
             response.statusCode = http:STATUS_UNAUTHORIZED;
-            response.setJsonPayload({"message": authError.message()});
-
+            response.setJsonPayload({"message": e.message()});
             return check caller->respond(response);
         }
 
@@ -104,43 +117,128 @@ service /scim2 on httpListener {
         return check caller->respond(response);
     }
 
-    resource function put users/[string userId](http:Caller caller, @http:Payload scim:UserResource userResource, @http:Header string authorization) returns error? {
+    resource function get users(@http:Query string[] filter, @http:Header string authorization, http:Caller caller) returns error? {
 
-        // Check and validate authorization credentials.
-        error|null authError = check checkAuth(authorization);
-        if (authError is error) {
-            http:Response response = new;
+        do {
+	        _ = check checkAuth(authorization);
+        } on fail var e {
+        	http:Response response = new;
             response.statusCode = http:STATUS_UNAUTHORIZED;
-            response.setJsonPayload({"message": authError.message()});
-
+            response.setJsonPayload({"message": e.message()});
             return check caller->respond(response);
         }
 
-        log:printInfo("Updating user with ID: " + userId);
+        string? userName = getUsername(filter);
+        if !(userName is string) {
+            http:Response response = new;
+            response.statusCode = http:STATUS_UNAUTHORIZED;
+            response.setJsonPayload({"message": "Invalid filter query"});
+            return check caller->respond(response);
+        }
 
-        // Send response back to IS.
+        // Create Salesforce client.
+        salesforce:Client baseClient = check new (sfConfig);
+
+        log:printInfo("Get user: " + userName);
+
+        // SOQL query to fetch the Lead ID based on the email
+        string query = string `SELECT Id FROM Lead WHERE Email = '${userName}'`;
+
+        // Execute the SOQL query with an explicit return type
+        stream<LeadRecord, error?> leadRecords = check baseClient->query(query);
+
+        string leadId = "";
+        // Iterate over the returned records (if any)
+        error? e = leadRecords.forEach(function(LeadRecord leadRecord) {
+            leadId = leadRecord.Id;
+        });
+
         http:Response response = new;
-        response.statusCode = http:STATUS_OK;
+        if !(e is error) {
+            scim:UserResource userResource = {
+                id: leadId
+            };
+            json scimResponse = {
+                "totalResults": 1,
+                "startIndex": 1,
+                "itemsPerPage": 1,
+                "schemas": [
+                    "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+                ],
+                "Resources": [userResource.toJson()]
+            };
+            log:printInfo("Retreived the lead: " + leadId);
+            response.setJsonPayload(scimResponse.toJson());
+            response.statusCode = http:STATUS_OK;
+        } else {
+            log:printError(msg = e.message());
+            response.statusCode = http:STATUS_BAD_REQUEST;
+            response.setJsonPayload({"message": e.message()});
+        }
         return check caller->respond(response);
     }
 
-    resource function delete users/[string userId](http:Caller caller, @http:Header string authorization) returns error? {
 
-        // Check and validate authorization credentials.
-        error|null authError = check checkAuth(authorization);
-        if (authError is error) {
-            http:Response response = new;
+    resource function delete users/[string leadId](http:Request request, @http:Header string authorization, http:Caller caller) returns error? {
+        
+        do {
+	        _ = check checkAuth(authorization);
+        } on fail var e {
+        	http:Response response = new;
             response.statusCode = http:STATUS_UNAUTHORIZED;
-            response.setJsonPayload({"message": authError.message()});
-
+            response.setJsonPayload({"message": e.message()});
             return check caller->respond(response);
         }
 
-        log:printInfo("Deleting user with ID: " + userId);
+        // Create Salesforce client.
+        salesforce:Client baseClient = check new (sfConfig);
 
-        // Send response back to IS.
+        log:printInfo("Delete user: " + leadId);
+
+        error? sfResponse = baseClient->delete("Lead", leadId);
+
         http:Response response = new;
-        response.statusCode = http:STATUS_NO_CONTENT;
+        if sfResponse is error {
+            log:printError(msg = sfResponse.message());
+            response.statusCode = http:STATUS_BAD_REQUEST;
+            response.setJsonPayload({"message": sfResponse.message()});
+        } else {
+            log:printInfo("Deleted the lead: " + leadId);
+            response.statusCode = http:STATUS_NO_CONTENT;
+        }
+        return check caller->respond(response);
+    }
+
+    resource function put users/[string leadId](http:Request request, @http:Header string authorization, http:Caller caller) returns error? {
+
+        do {
+	        _ = check checkAuth(authorization);
+        } on fail var e {
+        	http:Response response = new;
+            response.statusCode = http:STATUS_UNAUTHORIZED;
+            response.setJsonPayload({"message": e.message()});
+            return check caller->respond(response);
+        }
+
+        // Note: This is only a dummy method that does not call salesforce API.
+
+        scim:UserResource userResource = {
+            id: leadId
+        };
+        json scimResponse = {
+            "totalResults": 1,
+            "startIndex": 1,
+            "itemsPerPage": 1,
+            "schemas": [
+                "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+            ],
+            "Resources": [userResource.toJson()]
+        };
+
+        http:Response response = new;
+        log:printInfo("Updated the lead: " + leadId);
+        response.setJsonPayload(scimResponse.toJson());
+        response.statusCode = http:STATUS_OK;
         return check caller->respond(response);
     }
 }
