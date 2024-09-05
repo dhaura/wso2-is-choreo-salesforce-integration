@@ -222,7 +222,8 @@ service /scim2 on httpListener {
         // Note: This is only a dummy method that does not call salesforce API.
 
         scim:UserResource userResource = {
-            id: leadId
+            id: leadId,
+            userName: "userName"
         };
         json scimResponse = {
             "totalResults": 1,
