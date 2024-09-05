@@ -222,21 +222,16 @@ service /scim2 on httpListener {
         // Note: This is only a dummy method that does not call salesforce API.
 
         scim:UserResource userResource = {
-            id: leadId
-        };
-        json scimResponse = {
-            "totalResults": 1,
-            "startIndex": 1,
-            "itemsPerPage": 1,
-            "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:ListResponse"
-            ],
-            "Resources": [userResource.toJson()]
+            id: leadId,
+            userName: "userName",
+            schemas: [
+                "urn:ietf:params:scim:schemas:core:2.0:User"
+            ]
         };
 
         http:Response response = new;
         log:printInfo("Updated the lead: " + leadId);
-        response.setJsonPayload(scimResponse.toJson());
+        response.setJsonPayload(userResource.toJson());
         response.statusCode = http:STATUS_OK;
         return check caller->respond(response);
     }
