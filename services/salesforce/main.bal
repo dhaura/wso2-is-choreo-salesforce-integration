@@ -223,6 +223,7 @@ service /scim2 on httpListener {
 
         scim:UserResource userResource = {
             id: leadId,
+            userName: "userName",
             schemas: [
                 "urn:ietf:params:scim:schemas:core:2.0:User"
             ]
