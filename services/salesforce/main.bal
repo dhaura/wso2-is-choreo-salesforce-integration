@@ -92,7 +92,6 @@ service /scim2 on httpListener {
 
         // Create a Salesforce lead record.
         record {} leadRecord = {
-            "Company": "Guardio",
             "Email": email
         };
 
