@@ -85,14 +85,18 @@ service /scim2 on httpListener {
 
         // Extract user info from the SCIM request.
         string email = userResource?.userName ?: "";
-        // string firstName = userResource?.name?.givenName ?: "";
-        // string lastName = userResource?.name?.familyName ?: "";
+        string firstName = userResource?.name?.givenName ?: "_";
+        string lastName = userResource?.name?.familyName ?: "_";
 
-        log:printInfo("Salesforce provisoning user email: " + email);
+        log:printInfo("Salesforce provisoning user info: {email: " + email +
+            ", firstName: " + firstName + ", lastName: " + lastName + "}");
 
         // Create a Salesforce lead record.
         record {} leadRecord = {
-            "Email": email
+            "Company": "Guardio",
+            "Email": email,
+            "FirstName": firstName,
+            "LastName": lastName
         };
 
         // Initiate the Salesforce lead creation request.
