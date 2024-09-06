@@ -72,9 +72,9 @@ service /scim2 on httpListener {
 
         // Check and validate authorization credentials.
         do {
-	        _ = check checkAuth(authorization);
+            _ = check checkAuth(authorization);
         } on fail var e {
-        	http:Response response = new;
+            http:Response response = new;
             response.statusCode = http:STATUS_UNAUTHORIZED;
             response.setJsonPayload({"message": e.message()});
             return check caller->respond(response);
@@ -85,17 +85,15 @@ service /scim2 on httpListener {
 
         // Extract user info from the SCIM request.
         string email = userResource?.userName ?: "";
-        string firstName = userResource?.name?.givenName ?: "_";
         string lastName = userResource?.name?.familyName ?: "_";
 
         log:printInfo("Salesforce provisoning user info: {email: " + email +
-            ", firstName: " + firstName + ", lastName: " + lastName + "}");
+            ", lastName: " + lastName + "}");
 
         // Create a Salesforce lead record.
         record {} leadRecord = {
             "Company": "Guardio",
             "Email": email,
-            "FirstName": firstName,
             "LastName": lastName
         };
 
@@ -119,9 +117,9 @@ service /scim2 on httpListener {
     resource function get users(@http:Query string[] filter, @http:Header string authorization, http:Caller caller) returns error? {
 
         do {
-	        _ = check checkAuth(authorization);
+            _ = check checkAuth(authorization);
         } on fail var e {
-        	http:Response response = new;
+            http:Response response = new;
             response.statusCode = http:STATUS_UNAUTHORIZED;
             response.setJsonPayload({"message": e.message()});
             return check caller->respond(response);
@@ -177,13 +175,12 @@ service /scim2 on httpListener {
         return check caller->respond(response);
     }
 
-
     resource function delete users/[string leadId](http:Request request, @http:Header string authorization, http:Caller caller) returns error? {
-        
+
         do {
-	        _ = check checkAuth(authorization);
+            _ = check checkAuth(authorization);
         } on fail var e {
-        	http:Response response = new;
+            http:Response response = new;
             response.statusCode = http:STATUS_UNAUTHORIZED;
             response.setJsonPayload({"message": e.message()});
             return check caller->respond(response);
@@ -211,9 +208,9 @@ service /scim2 on httpListener {
     resource function put users/[string leadId](http:Request request, @http:Header string authorization, http:Caller caller) returns error? {
 
         do {
-	        _ = check checkAuth(authorization);
+            _ = check checkAuth(authorization);
         } on fail var e {
-        	http:Response response = new;
+            http:Response response = new;
             response.statusCode = http:STATUS_UNAUTHORIZED;
             response.setJsonPayload({"message": e.message()});
             return check caller->respond(response);
