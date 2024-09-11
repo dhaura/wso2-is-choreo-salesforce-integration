@@ -65,7 +65,7 @@ isolated function getUsername(string[] filter) returns string? {
     }
 }
 
-listener http:Listener httpListener = new (8090);
+listener http:Listener httpListener = new (9099);
 
 service /scim2 on httpListener {
     resource function post users(@http:Payload scim:UserResource userResource, @http:Header string authorization, http:Caller caller) returns error? {
