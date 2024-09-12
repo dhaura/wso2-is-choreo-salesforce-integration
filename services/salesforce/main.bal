@@ -27,7 +27,13 @@ salesforce:ConnectionConfig sfConfig = {
     }
 };
 
-type LeadRecord record {
+type LeadRecord record {|
+    string Email;
+    string LastName;
+    string Company;
+|};
+
+type LeadIdRecord record {
     string Id;
 };
 
@@ -89,11 +95,7 @@ service /scim2 on httpListener {
         log:printInfo("Salesforce provisoning user email: " + email);
 
         // Create a Salesforce lead record.
-        record {} leadRecord = {
-            "Company": "Guardio",
-            "Email": email,
-            "LastName": email
-        };
+        LeadRecord leadRecord = buildLeadRecord(userResource);
 
         // Initiate the Salesforce lead creation request.
         salesforce:CreationResponse|error sfResponse = baseClient->create("Lead", leadRecord);
@@ -140,28 +142,17 @@ service /scim2 on httpListener {
         string query = string `SELECT Id FROM Lead WHERE Email = '${userName}'`;
 
         // Execute the SOQL query with an explicit return type
-        stream<LeadRecord, error?> leadRecords = check baseClient->query(query);
+        stream<LeadIdRecord, error?> leadIdRecords = check baseClient->query(query);
 
         string leadId = "";
         // Iterate over the returned records (if any)
-        error? e = leadRecords.forEach(function(LeadRecord leadRecord) {
-            leadId = leadRecord.Id;
+        error? e = leadIdRecords.forEach(function(LeadIdRecord leadIdRecord) {
+            leadId = leadIdRecord.Id;
         });
 
         http:Response response = new;
         if !(e is error) {
-            scim:UserResource userResource = {
-                id: leadId
-            };
-            json scimResponse = {
-                "totalResults": 1,
-                "startIndex": 1,
-                "itemsPerPage": 1,
-                "schemas": [
-                    "urn:ietf:params:scim:api:messages:2.0:ListResponse"
-                ],
-                "Resources": [userResource.toJson()]
-            };
+            scim:UserResponse scimResponse = buildSCIMUserResponse({Id: leadId});
             log:printInfo("Retreived the lead: " + leadId);
             response.setJsonPayload(scimResponse.toJson());
             response.statusCode = http:STATUS_OK;
@@ -231,3 +222,21 @@ service /scim2 on httpListener {
         return check caller->respond(response);
     }
 }
+
+function buildLeadRecord(scim:UserResource scimUser) returns LeadRecord => {
+    Email: scimUser.userName ?: "",
+    LastName: scimUser.userName ?: "",
+    Company: "Guardio"
+};
+
+function buildSCIMUserResponse(LeadIdRecord leadIdRecord) returns scim:UserResponse => {
+    totalResults: 1,
+    itemsPerPage: 1,
+    startIndex: 1,
+    schemas: [
+        "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+    ],
+    Resources: [{
+        id: leadIdRecord.Id
+    }]
+};
