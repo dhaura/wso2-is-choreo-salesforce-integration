@@ -225,7 +225,7 @@ service /scim2 on httpListener {
 
 function buildLeadRecord(scim:UserResource scimUser) returns LeadRecord => {
     Email: scimUser.userName ?: "",
-    LastName: scimUser.userName ?: "",
+    LastName: extractName(scimUser.userName ?: ""),
     Company: "Guardio"
 };
 
@@ -240,3 +240,13 @@ function buildSCIMUserResponse(LeadIdRecord leadIdRecord) returns scim:UserRespo
         id: leadIdRecord.Id
     }]
 };
+
+function extractName(string userName) returns string {
+
+    string[] splittedUserName = regex:split(userName, "@");
+    if (splittedUserName.length() == 2) {
+        return splittedUserName[0];
+    } else {
+        return userName;
+    }
+}
